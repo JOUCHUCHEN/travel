@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>釜山四天三夜遊</title>
+    
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 引入 Google Fonts (Inter & Noto Sans TC) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- 引入 FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- 引入 Leaflet CSS (用於地圖) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+        }
+        /* 自定義捲軸 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+        /* Leaflet 彈出視窗樣式覆寫 */
+        .leaflet-popup-content-wrapper {
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .leaflet-popup-content {
+            margin: 16px;
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+        /* 自定義 Marker 樣式 */
+        .custom-div-icon {
+            background: transparent;
+            border: none;
+        }
+        .marker-pin {
+            width: 36px;
+            height: 36px;
+            border-radius: 50% 50% 50% 0;
+            background: #3b82f6;
+            position: absolute;
+            transform: rotate(-45deg);
+            left: 50%;
+            top: 50%;
+            margin: -18px 0 0 -18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+        }
+        .marker-pin::after {
+            content: '';
+            width: 28px;
+            height: 28px;
+            margin: 4px 0 0 4px;
+            background: #fff;
+            position: absolute;
+            border-radius: 50%;
+        }
+        .custom-div-icon i {
+            position: absolute;
+            width: 22px;
+            font-size: 14px;
+            left: 0;
+            right: 0;
+            margin: 10px auto;
+            text-align: center;
+            z-index: 10;
+            color: #1e293b;
+        }
+        
+        /* 顏色主題 */
+        .day1-bg { background-color: #3b82f6; } /* Blue */
+        .day2-bg { background-color: #ef4444; } /* Red */
+        .day3-bg { background-color: #10b981; } /* Green */
+        .day4-bg { background-color: #8b5cf6; } /* Purple */
+        .info-bg { background-color: #f59e0b; } /* Yellow (Hotel/Airport) */
+
+        .marker-day1 { background: #3b82f6; }
+        .marker-day2 { background: #ef4444; }
+        .marker-day3 { background: #10b981; }
+        .marker-day4 { background: #8b5cf6; }
+        .marker-info { background: #f59e0b; }
+
+        /* Sortable styles */
+        .sortable-ghost {
+            opacity: 0.4;
+            background-color: #f8fafc;
+        }
+        
+        .sortable-drag {
+            cursor: grabbing !important;
+        }
+        
+        .drop-zone-active {
+            background-color: #e2e8f0;
+            border-color: #94a3b8;
+        }
+    </style>
+</head>
+<body class="h-screen w-full flex flex-col md:flex-row overflow-hidden bg-slate-50 text-slate-800">
+
+    <!-- 左側邊欄 (行程清單) -->
+    <aside class="w-full md:w-1/3 lg:w-1/4 h-1/2 md:h-full bg-white shadow-xl z-20 flex flex-col order-2 md:order-1">
+        
+        <!-- Header -->
+        <div class="p-5 bg-slate-900 text-white shadow-md z-10 shrink-0">
+            <h1 class="text-xl font-bold mb-1"><i class="fa-solid fa-map-location-dot mr-2"></i>釜山四天三夜遊</h1>
+            <p class="text-xs text-slate-300">8/12(三) - 8/15(六)</p>
+        </div>
+
+        <!-- 天數切換 Tabs -->
+        <div class="flex overflow-x-auto bg-slate-100 border-b border-slate-200 shrink-0" id="tabs-container">
+            <button onclick="filterDay(0)" id="tab-0" class="tab-btn px-4 py-3 text-sm font-semibold border-b-2 border-slate-900 text-slate-900 whitespace-nowrap" data-day="0">全部</button>
+            <div class="relative flex-1 flex drop-target" data-day="1">
+                <button onclick="filterDay(1)" id="tab-1" class="tab-btn w-full px-4 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700 whitespace-nowrap">Day 1</button>
+            </div>
+            <div class="relative flex-1 flex drop-target" data-day="2">
+                <button onclick="filterDay(2)" id="tab-2" class="tab-btn w-full px-4 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700 whitespace-nowrap">Day 2</button>
+            </div>
+            <div class="relative flex-1 flex drop-target" data-day="3">
+                <button onclick="filterDay(3)" id="tab-3" class="tab-btn w-full px-4 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700 whitespace-nowrap">Day 3</button>
+            </div>
+            <div class="relative flex-1 flex drop-target" data-day="4">
+                <button onclick="filterDay(4)" id="tab-4" class="tab-btn w-full px-4 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700 whitespace-nowrap">Day 4</button>
+            </div>
+        </div>
+        
+        <!-- 拖曳提示區 -->
+        <div class="bg-indigo-50 border-b border-indigo-100 p-2 text-center text-xs text-indigo-600 font-medium shrink-0">
+            <i class="fa-solid fa-up-down-left-right mr-1"></i> 拖曳卡片可排序，拖至上方天數可更改日期
+        </div>
+
+        <!-- 景點列表容器 -->
+        <div id="location-list" class="flex-1 overflow-y-auto p-3 space-y-3 pb-10">
+            <!-- 列表項目將由 JavaScript 動態生成 -->
+        </div>
+        
+        <!-- 叫車提示 -->
+        <div class="p-3 bg-blue-50 border-t border-blue-100 text-xs text-blue-800 shrink-0 flex items-center">
+            <i class="fa-solid fa-circle-info mr-2 text-blue-500 text-lg"></i>
+            <span>建議使用 <b>Kakao T</b> 呼叫兩台計程車或一台 Venti 大型車。</span>
+        </div>
+    </aside>
+
+    <!-- 右側地圖容器 -->
+    <main class="w-full md:w-2/3 lg:w-3/4 h-1/2 md:h-full z-10 order-1 md:order-2 relative">
+        <div id="map" class="w-full h-full"></div>
+    </main>
+
+    <!-- 引入 Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- 引入 SortableJS (用於拖曳排序) -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+    
+    <script>
+        // 景點資料庫 (包含經緯度、天數、類型、描述與詳細地址)
+        const locations = [
+            // 基礎設施
+            { id: 'airport', name: '金海國際機場', lat: 35.1732, lng: 128.9463, day: 0, type: 'info', icon: 'fa-plane', colorClass: 'marker-info', desc: '8/12 15:30 抵達 | 8/15 22:00 起飛', address: '108 Gonghangjinip-ro, Gangseo-gu, Busan, 南韓' },
+            { id: 'hotel', name: 'Lavalse Hotel', lat: 35.0931, lng: 129.0381, day: 0, type: 'info', icon: 'fa-bed', colorClass: 'marker-info', desc: '住宿三晚。位於影島，坐擁無敵海景，過橋即是南浦洞。', address: '82 Bongnaenaru-ro, Yeongdo-gu, Busan, 南韓' },
+            
+            // Day 1
+            { id: 'd1-arrive', name: '航班抵達 & 交通建議', lat: 35.1733, lng: 128.9464, day: 1, type: 'info', icon: 'fa-plane-arrival', colorClass: 'marker-day1', desc: '15:30 抵達。估計 16:30 離開機場。6人同行建議提前預約「機場接送包車」或搭「Kakao T Venti」。', address: '108 Gonghangjinip-ro, Gangseo-gu, Busan, 南韓' },
+            { id: 'd1-checkin', name: 'Lavalse Hotel 辦理入住', lat: 35.0932, lng: 129.0382, day: 1, type: 'info', icon: 'fa-bed', colorClass: 'marker-day1', desc: '預計 17:20-17:30 抵達飯店。放好行李稍作休息後，即可前往南浦洞吃晚餐。', address: '82 Bongnaenaru-ro, Yeongdo-gu, Busan, 南韓' },
+            { id: 'd1-food2', name: '晚餐：洪祖豬腳', lat: 35.1005, lng: 129.0245, day: 1, type: 'food', icon: 'fa-bowl-food', colorClass: 'marker-day1', desc: '南浦洞知名美食！豬腳燉煮得非常軟嫩入味。', address: '164-1 Bupyeong-dong 1(il)-ga, Jung-gu, Busan, 南韓' },
+            { id: 'd1-food3', name: '晚餐：153龜浦麵條', lat: 35.0989, lng: 129.0260, day: 1, type: 'food', icon: 'fa-bowl-food', colorClass: 'marker-day1', desc: '平價美味的連鎖麵食館。提供不辣的湯麵、蒸餃等，溫和飽足。', address: '21 Gudeok-ro 34beon-gil, Jung-gu, Busan, 南韓' },
+            { id: 'd1-2-1', name: 'BIFF廣場', lat: 35.0983, lng: 129.0285, day: 1, type: 'attraction', icon: 'fa-star', colorClass: 'marker-day1', desc: '感受熱鬧的街頭氛圍與尋找地上的星光大道電影人手印！', address: '58-1 Gudeok-ro, Jung-gu, Busan, 南韓' },
+            { id: 'd1-hotteok1', name: '昇基堅果黑糖餅', lat: 35.0984, lng: 129.0286, day: 1, type: 'food', icon: 'fa-cookie-bite', colorClass: 'marker-day1', desc: 'BIFF廣場必吃！因李昇基造訪而聲名大噪，外皮酥脆、堅果滿滿。', address: 'BIFF Square, Jung-gu, Busan, 南韓' },
+            { id: 'd1-hotteok2', name: '元祖大叔糖餅', lat: 35.0985, lng: 129.0287, day: 1, type: 'food', icon: 'fa-cookie-bite', colorClass: 'marker-day1', desc: 'BIFF廣場另一家排隊名店，深受在地人喜愛的經典口味。', address: 'BIFF Square, Jung-gu, Busan, 南韓' },
+            { id: 'd1-2-2', name: '光復路時尚街', lat: 35.0995, lng: 129.0315, day: 1, type: 'shopping', icon: 'fa-bag-shopping', colorClass: 'marker-day1', desc: '南浦洞最繁華的購物街，品牌齊全，適合全家漫步逛街。', address: 'Gwangbok-ro, Jung-gu, Busan, 南韓' },
+            { id: 'd1-2-3', name: '南浦洞地下街', lat: 35.0980, lng: 129.0345, day: 1, type: 'shopping', icon: 'fa-bag-shopping', colorClass: 'marker-day1', desc: '不受天氣影響的地下購物天堂，服飾、美妝、雜貨應有盡有。', address: 'Jungang-daero, Jung-gu, Busan, 南韓' },
+            { id: 'd1-3-1', name: '아이러브뮤직 (I Love Music)', lat: 35.0992, lng: 129.0295, day: 1, type: 'shopping', icon: 'fa-music', colorClass: 'marker-day1', desc: '朵菲的 Kpop 第一站！南浦洞知名的唱片行。', address: '35 Gwangbok-ro, Jung-gu, Busan, 南韓' },
+            { id: 'd1-3-2', name: '케이팝프렌즈 (K-Pop Friends)', lat: 35.0998, lng: 129.0288, day: 1, type: 'shopping', icon: 'fa-music', colorClass: 'marker-day1', desc: '另一家必逛的 Kpop 專賣店，尋找周邊與專輯的好去處。', address: '24 Gwangbok-ro 49beon-gil, Jung-gu, Busan, 南韓' },
+
+            // Day 2
+            { id: 'd2-breakfast', name: '早餐：EGG DROP 南浦洞店', lat: 35.0986, lng: 129.0315, day: 2, type: 'food', icon: 'fa-bowl-food', colorClass: 'marker-day2', desc: '年輕人最愛！過橋即達，熱呼呼的厚片滑蛋吐司，適合外帶。', address: '83-1 Gwangbok-ro, Jung-gu, Busan, 南韓' },
+            { id: 'd2-1', name: '釜山甘川文化村', lat: 35.0975, lng: 129.0106, day: 2, type: 'attraction', icon: 'fa-camera', colorClass: 'marker-day2', desc: '以階梯式彩色房屋、像迷宮一樣的小巷以及小王子等豐富的藝術創作聞名的小村。', address: '203 Gamnae 2-ro, Saha-gu, Busan, 南韓' },
+            { id: 'd2-bakery', name: '甘川麵包店', lat: 35.0974, lng: 129.0104, day: 2, type: 'food', icon: 'fa-bread-slice', colorClass: 'marker-day2', desc: '在甘川文化村散步後補充體力的好地方，買些特色麵包休息墊胃。', address: '141 Gamnae 2-ro, Saha-gu, Busan, 南韓' },
+            { id: 'd2-2-1', name: '寶水洞書店街', lat: 35.1030, lng: 129.0230, day: 2, type: 'attraction', icon: 'fa-book', colorClass: 'marker-day2', desc: '充滿懷舊書香與獨立書店的特色巷弄，尋找可愛街貓。', address: '8 Bosudong 1(il)-ga, Jung-gu, Busan, 南韓' },
+            { id: 'd2-2-2', name: '國際市場', lat: 35.1000, lng: 129.0200, day: 2, type: 'attraction', icon: 'fa-store', colorClass: 'marker-day2', desc: '歷史悠久的綜合型大市場，體驗傳統釜山風情。', address: '25 Gukjesijang 2-gil, Jung-gu, Busan, 南韓' },
+            { id: 'd2-2-3', name: '富平罐頭市場', lat: 35.1015, lng: 129.0190, day: 2, type: 'food', icon: 'fa-store', colorClass: 'marker-day2', desc: '匯集各式道地韓國街頭小吃與乾貨的熱鬧市場。', address: '39 Bupyeong 1-gil, Jung-gu, Busan, 南韓' },
+            { id: 'd2-new', name: '札嘎其市場', lat: 35.0965, lng: 129.0275, day: 2, type: 'attraction', icon: 'fa-fish', colorClass: 'marker-day2', desc: '韓國最大的海鮮市場！一樓挑選生鮮，體驗在地文化。', address: '52 Jagalchihaean-ro, Jung-gu, Busan, 南韓' },
+            { id: 'd2-3-1', name: '西面 Kpop (雙龍Platinum)', lat: 35.1530, lng: 129.0596, day: 2, type: 'shopping', icon: 'fa-music', colorClass: 'marker-day2', desc: '朵菲的Kpop聖地！尋找最新專輯與周邊。', address: '33 Dongcheon-ro, Busanjin-gu, Busan, 南韓' },
+            { id: 'd2-seomyeon-jeonpo', name: '田浦咖啡街', lat: 35.1565, lng: 129.0645, day: 2, type: 'attraction', icon: 'fa-mug-hot', colorClass: 'marker-day2', desc: '充滿文青氣息與特色咖啡廳的街道，適合散步與拍照。', address: 'Jeonpo-daero 209beon-gil, Busanjin-gu, Busan, 南韓' },
+            { id: 'd2-seomyeon-vintage', name: '빈티지38 (Vintage 38)', lat: 35.1572, lng: 129.0638, day: 2, type: 'food', icon: 'fa-mug-hot', colorClass: 'marker-day2', desc: '田浦咖啡街指標性工業風咖啡廳，長輩休息好去處，甜點豐富。', address: '38 Jeonpo-daero 199beon-gil, Busanjin-gu, Busan, 南韓' },
+            { id: 'd2-3-2', name: 'Luft basement', lat: 35.1540, lng: 129.0605, day: 2, type: 'shopping', icon: 'fa-bag-shopping', colorClass: 'marker-day2', desc: '西面質感選物店，文青與設計小物的挖寶好去處。', address: '49 Dongcheon-ro, Busanjin-gu, Busan, 南韓' },
+            { id: 'd2-seomyeon-underground', name: '西面地下街', lat: 35.1577, lng: 129.0601, day: 2, type: 'shopping', icon: 'fa-bag-shopping', colorClass: 'marker-day2', desc: '釜山最大的地下購物中心，服飾美妝應有盡有，不受天氣影響。', address: '737 Jungang-daero, Busanjin-gu, Busan, 南韓' },
+            { id: 'd2-din1', name: '晚餐選擇一：新村銅盆大章魚燉排骨', lat: 35.1556, lng: 129.0571, day: 2, type: 'food', icon: 'fa-bowl-food', colorClass: 'marker-day2', desc: '微辣開胃的燉排骨加上整隻大章魚，視覺與味覺雙重享受，是西面人氣美食！', address: '27-2 Seojeon-ro 10beon-gil, Busanjin-gu, Busan, 南韓' },
+            { id: 'd2-din2', name: '晚餐選擇二：83烤肉', lat: 35.1555, lng: 129.0570, day: 2, type: 'food', icon: 'fa-bowl-food', colorClass: 'marker-day2', desc: '西面超人氣烤肉！服務超熱情、代烤技術好，小菜非常精緻。', address: '32 Seojeon-ro 10beon-gil, Busanjin-gu, Busan, 南韓' },
+
+            // Day 3
+            { id: 'd3-cheongsapo-bf1', name: '早餐選項一：八道海帶湯', lat: 35.1604, lng: 129.1926, day: 3, type: 'food', icon: 'fa-bowl-food', colorClass: 'marker-day3', desc: '非常適合長輩的傳統韓式早餐！海帶湯溫補暖胃，小菜豐富健康。', address: '139 Cheongsapo-ro, Haeundae-gu, Busan, 南韓' },
+            { id: 'd3-cheongsapo-bf3', name: '早餐選項二：Diart Coffee', lat: 35.1599, lng: 129.1913, day: 3, type: 'food', icon: 'fa-bowl-food', colorClass: 'marker-day3', desc: '以土耳其「卡伊馬克(Kaymak)」佐烤麵包聞名，是很棒的輕食早午餐。', address: '128 Cheongsapo-ro, Haeundae-gu, Busan, 南韓' },
+            { id: 'd3-cheongsapo-skywalk', name: '青沙浦踏石觀景臺 (天空步道)', lat: 35.1616, lng: 129.1973, day: 3, type: 'attraction', icon: 'fa-shoe-prints', colorClass: 'marker-day3', desc: '免費的海上透明玻璃步道！從青沙浦平緩步行約10分鐘可達，需穿上免費鞋套。', address: 'San 3-9 Jung-dong, Haeundae-gu, Busan, 南韓' },
+            { id: 'd3-cheongsapo-2', name: '青沙浦小鎌倉平交道', lat: 35.1608, lng: 129.1920, day: 3, type: 'attraction', icon: 'fa-camera', colorClass: 'marker-day3', desc: '超美打卡點！海岸列車駛過平交道搭配湛藍海景，宛如置身日本鎌倉。', address: '116 Cheongsapo-ro, Haeundae-gu, Busan, 南韓' },
+            { id: 'd3-2', name: '膠囊列車 (青沙浦 ➔ 尾浦)', lat: 35.1610, lng: 129.1924, day: 3, type: 'attraction', icon: 'fa-train-tram', colorClass: 'marker-day3', desc: '搶不到票，需現場購票。如購不到票，備案為海岸列車。', address: '116 Cheongsapo-ro, Haeundae-gu, Busan, 南韓' },
+            { id: 'd3-1-1', name: '點心選項一：OPS 麵包總店', lat: 35.1633, lng: 129.1628, day: 3, type: 'food', icon: 'fa-bread-slice', colorClass: 'marker-day3', desc: '海雲台著名麵包店，推薦挑選各式精緻麵包作為散步下午茶。', address: '31 Jungdong 1-ro, Haeundae-gu, Busan, 南韓' },
+            { id: 'd3-1-2', name: '點心選項二：自然島鹽麵包', lat: 35.1601, lng: 129.1622, day: 3, type: 'food', icon: 'fa-bread-slice', colorClass: 'marker-day3', desc: '釜山人氣爆棚的排隊名店！奶油香氣濃郁的鹽麵包，非常適合外帶。', address: '14 Gunam-ro, Haeundae-gu, Busan, 南韓' },
+            { id: 'd3-4', name: '三麗鷗主題店 (Sanrio)', lat: 35.1619, lng: 129.1581, day: 3, type: 'shopping', icon: 'fa-bag-shopping', colorClass: 'marker-day3', desc: '朵菲圓夢行程！免預約可直接逛一樓周邊商品區，沉浸在可愛角色中。', address: '16 Udong 1-ro 56beon-gil, Haeundae-gu, Busan, 南韓' },
+            { id: 'd3-5', name: '午餐選項一：海雲台名品蔘雞湯', lat: 35.1624, lng: 129.1628, day: 3, type: 'food', icon: 'fa-bowl-food', colorClass: 'marker-day3', desc: '長輩友善美食：溫補的蔘雞湯，軟嫩好入口。', address: '11 Jungdong 2-ro 10beon-gil, Haeundae-gu, Busan, 南韓' },
+            { id: 'd3-haeundae-meat', name: '午餐選項二：味贊王鹽烤肉 (海雲台店)', lat: 35.1606, lng: 129.1593, day: 3, type: 'food', icon: 'fa-bowl-food', colorClass: 'marker-day3', desc: '海雲台熱門烤肉！代烤服務好，小菜搭配烤肉一絕，長輩也能輕鬆吃。', address: '46 Haeun-daero 608beon-gil, Haeundae-gu, Busan, 南韓' },
+            { id: 'd3-6-1', name: '[百貨] 新世界 Centum City', lat: 35.1689, lng: 129.1290, day: 3, type: 'shopping', icon: 'fa-bag-shopping', colorClass: 'marker-day3', desc: '韓國最大級百貨公司，適合全家吹冷氣休息、逛街。', address: '35 Centumnam-daero, Haeundae-gu, Busan, 南韓' },
+            { id: 'd3-6-2', name: '[商場] 大創 Daiso (Marine City)', lat: 35.1585, lng: 129.1448, day: 3, type: 'shopping', icon: 'fa-bag-shopping', colorClass: 'marker-day3', desc: 'Marine City 巨型大創，好逛好買，採買韓國實用小物的聖地。', address: '38 Marine city 2-ro, Haeundae-gu, Busan, 南韓' },
+            { id: 'd3-7-1', name: '廣安里海水浴場', lat: 35.1535, lng: 129.1190, day: 3, type: 'attraction', icon: 'fa-umbrella-beach', colorClass: 'marker-day3', desc: '釜山必訪海灘，漫步在細緻沙灘上，近距離感受海浪與美景。', address: '219 Gwanganhaean-ro, Suyeong-gu, Busan, 南韓' },
+            { id: 'd3-7-2', name: 'Millac the Market', lat: 35.1541, lng: 129.1278, day: 3, type: 'shopping', icon: 'fa-bag-shopping', colorClass: 'marker-day3', desc: '複合式紅磚商場。可以買些小吃，全家人坐在室內大階梯上看海！', address: '56 Millaksubyeon-ro 17beon-gil, Suyeong-gu, Busan, 南韓' },
+            { id: 'd3-7-3', name: '廣安大橋', lat: 35.1450, lng: 129.1250, day: 3, type: 'attraction', icon: 'fa-bridge', colorClass: 'marker-day3', desc: '絕美的跨海大橋地標。建議日落後在此欣賞浪漫的點燈夜景。', address: 'Gwangan Bridge, Suyeong-gu, Busan, 南韓' },
+            { id: 'd3-gw-din-um', name: '晚餐選項一：嚴湧帛豬肉湯飯 (水營店)', lat: 35.1664, lng: 129.1147, day: 3, type: 'food', icon: 'fa-bowl-food', colorClass: 'marker-day3', desc: '用餐環境有質感，分為清湯與濃湯，肉質極佳，極受在地人喜愛的排隊名店。', address: '39 Suyeong-ro 680beon-gil, Suyeong-gu, Busan, 南韓' },
+            { id: 'd3-gw-din2', name: '晚餐選項二：水邊最高豬肉湯飯', lat: 35.1555, lng: 129.1332, day: 3, type: 'food', icon: 'fa-bowl-food', colorClass: 'marker-day3', desc: '就在 Millac the Market 旁！釜山超人氣排隊名店，湯頭香濃醇厚。', address: '27 Gwanganhaean-ro 370beon-gil, Suyeong-gu, Busan, 南韓' },
+
+            // Day 4
+            { id: 'd4-breakfast', name: '早餐：飯店海景麵包時光', lat: 35.0931, lng: 129.0381, day: 4, type: 'food', icon: 'fa-bowl-food', colorClass: 'marker-day4', desc: '在房內悠閒享用昨天買的 OPS 與自然島鹽麵包，配著海景從容準備退房。', address: '82 Bongnaenaru-ro, Yeongdo-gu, Busan, 南韓' },
+            { id: 'd4-3', name: '白淺灘文化村 & 貓咪文創', lat: 35.0784, lng: 129.0435, day: 4, type: 'attraction', icon: 'fa-cat', colorClass: 'marker-day4', desc: '海景迷人，尋找街貓。必逛朵菲會愛的貓咪主題店。', address: '379 Huinnyeoul-gil, Yeongdo-gu, Busan, 南韓' },
+            { id: 'd4-4-1', name: '松島雲端步道 (纜車為建議項目)', lat: 35.0762, lng: 129.0229, day: 4, type: 'attraction', icon: 'fa-shoe-prints', colorClass: 'marker-day4', desc: '雲端步道平坦無階梯，極度適合長輩散步！走完後可視體力決定是否搭乘纜車。', address: '171 Songdohaebyeon-ro, Seo-gu, Busan, 南韓' },
+            { id: 'd4-5', name: '樂天百貨光復店', lat: 35.0988, lng: 129.0366, day: 4, type: 'shopping', icon: 'fa-bag-shopping', colorClass: 'marker-day4', desc: '頂樓觀景台賞景，地下超市大採購伴手禮，準備前往機場！', address: '2 Jungang-daero, Jung-gu, Busan, 南韓' }
+        ];
+
+        let map;
+        let markers = {};
+        let currentDayFilter = 0;
+        let sortableList = null;
+        let capsuleRouteLayer = null; // 儲存膠囊列車路線圖層
+        
+        // 列車沿線座標 (青沙浦 ➔ 尾浦，沿著海岸線)
+        const capsuleRouteCoords = [
+            [35.1610, 129.1924], // 青沙浦站
+            [35.1598, 129.1895], // 接近青沙浦
+            [35.1585, 129.1864], // 沿海彎道 2
+            [35.1580, 129.1824], // 迎月隧道附近
+            [35.1585, 129.1783], // 沿海彎道 1
+            [35.1595, 129.1755]  // 尾浦站
+        ];
+
+        function initMap() {
+            // 初始化地圖，中心點設在釜山
+            map = L.map('map', {
+                zoomControl: false // 預設控制元件隱藏，我們移到底部
+            }).setView([35.1379, 129.0556], 12);
+
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+            // 加入 OpenStreetMap 圖層
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> contributors',
+                maxZoom: 19
+            }).addTo(map);
+
+            // 加入所有標記
+            updateAllMarkers();
+
+            // 初始渲染側邊欄列表
+            renderList();
+            
+            // 初始化天數 Tab 的 Drop Zone 功能
+            initTabDropZones();
+        }
+        
+        function updateAllMarkers() {
+            // 移除舊的標記
+            for (let id in markers) {
+                map.removeLayer(markers[id]);
+            }
+            markers = {};
+            
+            // 加入新的標記
+            locations.forEach(loc => {
+                // 根據當前的 day 更新顏色 class
+                loc.colorClass = loc.day === 0 ? 'marker-info' : `marker-day${loc.day}`;
+                
+                // 建立自定義 HTML Icon
+                const customIcon = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: `<div class="marker-pin ${loc.colorClass}"></div><i class="fa-solid ${loc.icon}"></i>`,
+                    iconSize: [30, 42],
+                    iconAnchor: [15, 42],
+                    popupAnchor: [0, -35]
+                });
+
+                // 建立 Popup 內容，新增地址顯示
+                const popupContent = `
+                    <div class="w-48 sm:w-56">
+                        <div class="text-xs font-bold text-slate-500 mb-1">
+                            ${loc.day === 0 ? '住宿/交通' : `Day ${loc.day}`}
+                        </div>
+                        <h3 class="text-base font-bold text-slate-800 mb-1 leading-tight">${loc.name}</h3>
+                        ${loc.address ? `<div class="text-[10px] text-slate-500 mb-2 flex items-start gap-1"><i class="fa-solid fa-location-dot mt-0.5 text-slate-400"></i><span>${loc.address}</span></div>` : ''}
+                        <p class="text-sm text-slate-600 mb-2">${loc.desc}</p>
+                    </div>
+                `;
+
+                const marker = L.marker([loc.lat, loc.lng], { icon: customIcon })
+                    .bindPopup(popupContent);
+                
+                markers[loc.id] = marker;
+            });
+            
+            // 將過濾後的標記加到地圖上
+            updateMapBounds();
+        }
+
+        function getDayColor(day) {
+            switch(day) {
+                case 1: return 'text-blue-600 bg-blue-100';
+                case 2: return 'text-red-600 bg-red-100';
+                case 3: return 'text-emerald-600 bg-emerald-100';
+                case 4: return 'text-purple-600 bg-purple-100';
+                default: return 'text-amber-600 bg-amber-100';
+            }
+        }
+
+        function getBorderColor(day) {
+            switch(day) {
+                case 1: return 'border-blue-200 hover:border-blue-400';
+                case 2: return 'border-red-200 hover:border-red-400';
+                case 3: return 'border-emerald-200 hover:border-emerald-400';
+                case 4: return 'border-purple-200 hover:border-purple-400';
+                default: return 'border-amber-200 hover:border-amber-400';
+            }
+        }
+
+        // 渲染側邊欄清單
+        function renderList() {
+            const listContainer = document.getElementById('location-list');
+            listContainer.innerHTML = '';
+
+            // 根據目前選擇的天數進行過濾
+            const filteredLocations = locations.filter(loc => 
+                currentDayFilter === 0 || loc.day === currentDayFilter
+            );
+
+            filteredLocations.forEach(loc => {
+                const dayBadge = loc.day === 0 ? '資訊' : `D${loc.day}`;
+                const card = document.createElement('div');
+                // 加上 select-none 防止反白文字，讓整張卡片都可以隨意拖曳
+                card.className = `p-3 bg-white border ${getBorderColor(loc.day)} rounded-xl transition-shadow hover:shadow-md flex items-stretch group sortable-item select-none cursor-grab active:cursor-grabbing`;
+                card.setAttribute('data-id', loc.id); // 設置 ID 以供拖曳排序使用
+
+                card.innerHTML = `
+                    <!-- 視覺提示手把 -->
+                    <div class="flex items-center justify-center pr-2 text-slate-300 group-hover:text-slate-500 transition-colors shrink-0">
+                        <i class="fa-solid fa-grip-vertical text-lg"></i>
+                    </div>
+                    <!-- 內容區塊 -->
+                    <div class="flex-1 flex items-start">
+                        <div class="mt-1 mr-3 w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${loc.day === 0 ? 'bg-amber-100 text-amber-600' : 
+                            loc.day === 1 ? 'bg-blue-100 text-blue-600' :
+                            loc.day === 2 ? 'bg-red-100 text-red-600' :
+                            loc.day === 3 ? 'bg-emerald-100 text-emerald-600' : 'bg-purple-100 text-purple-600'}">
+                            <i class="fa-solid ${loc.icon} text-lg"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-md ${getDayColor(loc.day)}">${dayBadge}</span>
+                                <h3 class="font-bold text-sm text-slate-800 group-hover:text-blue-600 transition-colors">${loc.name}</h3>
+                            </div>
+                            ${loc.address ? `<div class="text-[10px] text-slate-400 mb-1.5 flex items-start gap-1"><i class="fa-solid fa-map-pin mt-0.5"></i> <span class="leading-tight">${loc.address}</span></div>` : ''}
+                            <p class="text-xs text-slate-500 leading-relaxed pointer-events-none">${loc.desc}</p>
+                        </div>
+                    </div>
+                `;
+                
+                // 綁定點擊事件，避免與拖曳手勢衝突
+                card.addEventListener('click', () => {
+                    focusLocation(loc.id);
+                });
+                
+                listContainer.appendChild(card);
+            });
+
+            // 每次重新渲染後，初始化拖曳功能
+            initSortable();
+        }
+
+        // 初始化拖曳功能
+        function initSortable() {
+            const el = document.getElementById('location-list');
+            
+            if (sortableList) {
+                sortableList.destroy();
+            }
+            
+            // Only initialize Sortable if there are items to sort
+            if (el.children.length === 0) return;
+            
+            sortableList = Sortable.create(el, {
+                group: 'shared', // 允許與上方 Tabs 連動
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                dragClass: 'sortable-drag',
+                forceFallback: true, // 保證視覺回饋一致，取代有衝突的原生 API
+                fallbackClass: "sortable-fallback", 
+                onEnd: function (evt) {
+                    // 如果被拖移到別的群組(Tabs)，就不要在這裡處理
+                    if (evt.to !== evt.from) return;
+
+                    // 處理列表內的排序邏輯
+                    const currentIds = Array.from(el.children).map(child => child.getAttribute('data-id'));
+                    
+                    // 更新全域 locations 陣列，以保證切換天數後順序仍然保留
+                    const reorderedLocations = [];
+                    let displayIdx = 0;
+                    
+                    for (let i = 0; i < locations.length; i++) {
+                        if (currentIds.includes(locations[i].id)) {
+                            // 如果這個項目在當前的顯示列表中，則按照拖曳後的新順序提取
+                            const targetId = currentIds[displayIdx];
+                            reorderedLocations.push(locations.find(l => l.id === targetId));
+                            displayIdx++;
+                        } else {
+                            // 如果不在當前列表中（被天數過濾隱藏），則保留相對位置不變
+                            reorderedLocations.push(locations[i]);
+                        }
+                    }
+                    
+                    // 覆寫原始陣列
+                    locations.splice(0, locations.length, ...reorderedLocations);
+                }
+            });
+        }
+        
+        // --- 拖曳至 Tab 改變天數的邏輯 ---
+        let tabSortables = [];
+        
+        function initTabDropZones() {
+            // 清除舊的監聽
+            tabSortables.forEach(s => s.destroy());
+            tabSortables = [];
+
+            // 利用 Sortable 的 Group 功能，將天數 Tab 也變成一個可拖放的容器
+            document.querySelectorAll('.drop-target').forEach(target => {
+                const sortable = Sortable.create(target, {
+                    group: {
+                        name: 'shared',
+                        put: true,   // 允許卡片放入
+                        pull: false  // 不允許從這裡拉出
+                    },
+                    ghostClass: 'drop-zone-active',
+                    onAdd: function (evt) {
+                        const draggedItemId = evt.item.getAttribute('data-id');
+                        const targetDay = parseInt(target.getAttribute('data-day'));
+                        
+                        // 移除剛被拖放進 Tab 的 DOM 元素 (因為我們只需要更新資料並重繪)
+                        evt.item.remove();
+                        
+                        // 找到該項目並更新其 day 屬性
+                        const locIndex = locations.findIndex(l => l.id === draggedItemId);
+                        if(locIndex !== -1 && locations[locIndex].day !== 0) { // 防止住宿/機場被改天數
+                            // 更新天數
+                            locations[locIndex].day = targetDay;
+                            
+                            // 更新全域 locations 陣列順序，將其移到目標天數的最後面
+                            const movedItem = locations.splice(locIndex, 1)[0];
+                            locations.push(movedItem);
+                            
+                            // 自動切換到目標天數的畫面
+                            filterDay(targetDay);
+                        }
+                    }
+                });
+                tabSortables.push(sortable);
+            });
+        }
+        // --- 結束拖曳至 Tab 邏輯 ---
+
+        // 點擊列表時在地圖上聚焦並開啟 popup
+        function focusLocation(id) {
+            const loc = locations.find(l => l.id === id);
+            if (loc && map && markers[id]) {
+                // 飛躍動畫
+                map.flyTo([loc.lat, loc.lng], 15, {
+                    duration: 1.5
+                });
+                
+                // 等待飛躍結束後打開 popup
+                setTimeout(() => {
+                    markers[id].openPopup();
+                }, 1500);
+            }
+        }
+
+        // 過濾天數 Tabs
+        function filterDay(day) {
+            currentDayFilter = day;
+            
+            // 更新 Tabs UI
+            document.querySelectorAll('.tab-btn').forEach((btn) => {
+                // 找到對應的 day
+                const btnDay = btn.id === 'tab-0' ? 0 : parseInt(btn.closest('.drop-target')?.getAttribute('data-day') || 0);
+                
+                if (btnDay === day || (btn.id==='tab-0' && day===0)) {
+                    btn.classList.add('border-slate-900', 'text-slate-900');
+                    btn.classList.remove('border-transparent', 'text-slate-500');
+                } else {
+                    btn.classList.remove('border-slate-900', 'text-slate-900');
+                    btn.classList.add('border-transparent', 'text-slate-500');
+                }
+            });
+
+            // 重新渲染列表
+            renderList();
+
+            // 調整地圖範圍
+            updateMapBounds();
+        }
+        
+        function updateMapBounds() {
+            const bounds = [];
+            locations.forEach(loc => {
+                if (currentDayFilter === 0 || loc.day === currentDayFilter || loc.day === 0) { // 當選擇特定天數時，也顯示飯店/機場
+                    bounds.push([loc.lat, loc.lng]);
+                    markers[loc.id].addTo(map);
+                } else {
+                    map.removeLayer(markers[loc.id]);
+                }
+            });
+
+            // --- 動態繪製列車路線 ---
+            // 尋找列車目前被拖曳安排在哪一天
+            const capsuleLoc = locations.find(l => l.name.includes('列車') || l.name.includes('天空艙'));
+            const capsuleDay = capsuleLoc ? capsuleLoc.day : 3;
+
+            // 只有在瀏覽「全部(0)」或「包含列車的那天」時才顯示路線
+            if (currentDayFilter === 0 || currentDayFilter === capsuleDay) {
+                if (!capsuleRouteLayer) {
+                    capsuleRouteLayer = L.polyline(capsuleRouteCoords, {
+                        color: '#f43f5e', // 醒目的玫瑰紅色
+                        weight: 6,
+                        dashArray: '12, 10', // 創造鐵軌般的虛線效果
+                        opacity: 0.9,
+                        lineJoin: 'round'
+                    }).bindTooltip("🛤️ 海雲台海岸列車路線 (青沙浦 ➔ 尾浦)", {sticky: true});
+                }
+                if (!map.hasLayer(capsuleRouteLayer)) {
+                    capsuleRouteLayer.addTo(map);
+                }
+                
+                // 如果是單獨查看這一天，將路線的經緯度也納入畫面縮放範圍中
+                if (currentDayFilter === capsuleDay) {
+                    capsuleRouteCoords.forEach(coord => bounds.push(coord));
+                }
+            } else {
+                if (capsuleRouteLayer && map.hasLayer(capsuleRouteLayer)) {
+                    map.removeLayer(capsuleRouteLayer);
+                }
+            }
+            // --------------------------
+
+            if (bounds.length > 0 && map) {
+                map.fitBounds(bounds, { padding: [50, 50] });
+            }
+        }
+
+        // 頁面載入完成後初始化
+        document.addEventListener('DOMContentLoaded', initMap);
+
+    </script>
+</body>
+</html>
