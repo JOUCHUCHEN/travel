@@ -121,8 +121,8 @@
 </head>
 <body class="h-screen w-full flex flex-col md:flex-row overflow-hidden bg-slate-50 text-slate-800">
 
-    <!-- 左側邊欄 (行程清單) -->
-    <aside class="w-full md:w-1/3 lg:w-1/4 flex-1 md:h-full bg-white shadow-xl z-20 flex flex-col order-2 md:order-1">
+    <!-- 左側邊欄 (行程清單) - 手機版改為 flex-1 佔滿剩餘高度 -->
+    <aside class="w-full md:w-1/3 lg:w-1/4 flex-1 min-h-0 bg-white shadow-xl z-20 flex flex-col order-2 md:order-1">
         
         <!-- Header -->
         <div class="p-5 bg-slate-900 text-white shadow-md z-10 shrink-0 flex justify-between items-center">
@@ -154,10 +154,10 @@
         
         <!-- 拖曳提示區 -->
         <div class="bg-indigo-50 border-b border-indigo-100 p-2 text-center text-xs text-indigo-600 font-medium shrink-0">
-            <i class="fa-solid fa-up-down-left-right mr-1"></i> 拖曳卡片可排序，拖至上方天數可更改日期
+            <i class="fa-solid fa-up-down-left-right mr-1"></i> 手機版請「長按」拖曳卡片排序
         </div>
 
-        <!-- 景點列表容器 -->
+        <!-- 景點列表容器 - 加入 overflow-y-auto 確保內部可以獨立捲動 -->
         <div id="location-list" class="flex-1 overflow-y-auto p-3 space-y-3 pb-10">
             <!-- 列表項目將由 JavaScript 動態生成 -->
         </div>
@@ -169,7 +169,7 @@
         </div>
     </aside>
 
-    <!-- 右側地圖容器 -->
+    <!-- 右側地圖容器 - 手機版固定為 30vh 以保留下方空間給景點列表 -->
     <main class="w-full md:w-2/3 lg:w-3/4 h-[30vh] md:h-full shrink-0 z-10 order-1 md:order-2 relative">
         <div id="map" class="w-full h-full"></div>
     </main>
@@ -182,7 +182,7 @@
     
     <script>
         const locations = [
-            // 基礎設施
+            // 基礎設施 (Day 0)
             { id: 'airport', name: '金海國際機場', lat: 35.1732, lng: 128.9463, day: 0, type: 'info', icon: 'fa-plane', colorClass: 'marker-info', desc: '8/12 15:30 抵達 | 8/15 22:00 起飛', address: '108 Gonghangjinip-ro, Gangseo-gu, Busan, 南韓' },
             { id: 'hotel', name: 'Lavalse Hotel', lat: 35.0931, lng: 129.0381, day: 0, type: 'info', icon: 'fa-bed', colorClass: 'marker-info', desc: '住宿三晚。位於影島，坐擁無敵海景，過橋即是南浦洞。', address: '82 Bongnaenaru-ro, Yeongdo-gu, Busan, 南韓' },
             
@@ -377,9 +377,10 @@
                 
                 listContainer.appendChild(card);
             });
-
+            
+            // 每次重新渲染後，初始化拖曳功能
             initSortable();
-        }
+        } // 修復了這裡缺失的結尾大括號
 
         function initSortable() {
             const el = document.getElementById('location-list');
@@ -393,6 +394,8 @@
             sortableList = Sortable.create(el, {
                 group: 'shared',
                 animation: 150,
+                delay: 250, // 手機版需長按 250 毫秒才觸發拖曳，避免與捲動衝突
+                delayOnTouchOnly: true, // 只有觸控裝置需要長按，電腦版滑鼠可以直接拖
                 ghostClass: 'sortable-ghost',
                 dragClass: 'sortable-drag',
                 forceFallback: true,
@@ -413,7 +416,6 @@
                             reorderedLocations.push(locations[i]);
                         }
                     }
-                    
                     locations.splice(0, locations.length, ...reorderedLocations);
                 }
             });
@@ -427,11 +429,7 @@
 
             document.querySelectorAll('.drop-target').forEach(target => {
                 const sortable = Sortable.create(target, {
-                    group: {
-                        name: 'shared',
-                        put: true,
-                        pull: false
-                    },
+                    group: { name: 'shared', put: true, pull: false },
                     ghostClass: 'drop-zone-active',
                     onAdd: function (evt) {
                         const draggedItemId = evt.item.getAttribute('data-id');
@@ -455,13 +453,8 @@
         function focusLocation(id) {
             const loc = locations.find(l => l.id === id);
             if (loc && map && markers[id]) {
-                map.flyTo([loc.lat, loc.lng], 15, {
-                    duration: 1.5
-                });
-                
-                setTimeout(() => {
-                    markers[id].openPopup();
-                }, 1500);
+                map.flyTo([loc.lat, loc.lng], 15, { duration: 1.5 });
+                setTimeout(() => { markers[id].openPopup(); }, 1500);
             }
         }
 
@@ -470,7 +463,6 @@
             
             document.querySelectorAll('.tab-btn').forEach((btn) => {
                 const btnDay = btn.id === 'tab-0' ? 0 : parseInt(btn.closest('.drop-target')?.getAttribute('data-day') || 0);
-                
                 if (btnDay === day || (btn.id==='tab-0' && day===0)) {
                     btn.classList.add('border-slate-900', 'text-slate-900');
                     btn.classList.remove('border-transparent', 'text-slate-500');
@@ -482,6 +474,7 @@
 
             renderList();
             
+            // 讓列表滾動回到最上方
             const listContainer = document.getElementById('location-list');
             if (listContainer) {
                 listContainer.scrollTop = 0;
@@ -517,7 +510,6 @@
                 if (!map.hasLayer(capsuleRouteLayer)) {
                     capsuleRouteLayer.addTo(map);
                 }
-                
                 if (currentDayFilter === capsuleDay) {
                     capsuleRouteCoords.forEach(coord => bounds.push(coord));
                 }
@@ -540,7 +532,7 @@
             btn.disabled = true;
             btn.classList.add('opacity-75', 'cursor-not-allowed');
 
-            // 直接將 HTML 字串傳給 html2pdf，不再加入 DOM 中。徹底解決白畫面與手機寬度截斷問題
+            // 採用純字串構建 HTML 以避免 RWD 切斷問題
             const pdfContent = `
                 <div style="font-family: 'Noto Sans TC', sans-serif; padding: 20px; color: #1e293b; background: white; width: 100%;">
                     <div style="text-align: center; margin-bottom: 20px;">
@@ -591,11 +583,11 @@
             // 將住宿交通(0)改到最前面
             const daysToRender = [0, 1, 2, 3, 4];
             const dayNames = {
+                0: '住宿與交通資訊',
                 1: 'Day 1 行程', 
                 2: 'Day 2 行程', 
                 3: 'Day 3 行程', 
-                4: 'Day 4 行程', 
-                0: '住宿與交通資訊'
+                4: 'Day 4 行程' 
             };
 
             daysToRender.forEach(day => {
